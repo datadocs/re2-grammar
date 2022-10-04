@@ -1,186 +1,551 @@
+/*
+ * Copyright (c) 2022 by David Litwin
+ *
+ * The MIT license.
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Project          : PCRE Parser, an ANTLR 4 grammar for PCRE
+ * Developed by     : David Litwin, david@datadocs.com
+ * Grammar from     : https://github.com/google/re2/wiki/Syntax/
+ * Inspiration from : Bart Kiers' https://github.com/bkiers/pcre-parser/blob/master/src/main/antlr4/nl/bigo/pcreparser/PCRE.g4
+ */
+
+ // Note: Single-line comments after "//" are author comments.
+ //       Multi-line comments between "/* ... */" are copy-pasted from Re2 Syntax
 grammar Re2;
-// Based off re2 grammar from:                      https://github.com/google/re2/wiki/Syntax/
-// Overall top-level guidance and inspiration from: https://github.com/bkiers/pcre-parser/blob/master/src/main/antlr4/nl/bigo/pcreparser/PCRE.g4
 
 root
     : regex EOF
     ;
 
+/*     Composition
+ *     The operator precedence, from weakest to strongest binding, is first alternation,
+ *     then concatenation, and finally the repetition operators. Explicit parentheses can be used
+ *     to force different meanings, just as in arithmetic expressions.
+ *     Some examples: ab|cd is equivalent to (ab)|(cd); ab* is equivalent to a(b*).
+ *
+ *      xy	    x followed by y
+ *      x|y	    x or y (prefer x)
+*/
 regex
-    : (atom quantifier?) *                          # SingularExpr
-    | regex (Or regex)+                    # AlternationExpr
+    : (atom repetition?)*                               # RegexUnit
+    | regex (Pipe regex)+                               # RegexAlternation
     ;
 
 
+/* 	    Repetitions
+ *      x*	    zero or more x, prefer more
+ *      x+	    one or more x, prefer more
+ *      x?	    zero or one x, prefer one
+ *      x{n,m}	n or n+1 or ... or m x, prefer more
+ *      x{n,}	n or more x, prefer more
+ *      x{n}	exactly n x
+ *      x*?	    zero or more x, prefer fewer
+ *      x+?	    one or more x, prefer fewer
+ *      x??	    zero or one x, prefer zero
+ *      x{n,m}?	n or n+1 or ... or m x, prefer fewer
+ *      x{n,}?	n or more x, prefer fewer
+ *      x{n}?	exactly n x
+*/
+repetition
+    : QuestionMark QuestionMark?                        # OptionalQuanitifier
+    | Plus QuestionMark?                                # OneOrMoreQuantifier
+    | Star QuestionMark?                                # ZeroOrMoreQuantifier
+    | OpenBrace number (Comma number?)? CloseBrace      # NumericQuantifier
+    ;
+
+
+/* 	    Atoms
+ *
+ *      kinds of expressions	                        example
+ *      any character	                                .
+ *      character class	                                [xyz]
+ *      negated character class	                        [^xyz]
+ *      Perl character class                            \d
+ *      negated Perl character class	                \D
+ *      ASCII character class (link)	                [[:alpha:]]
+ *      negated ASCII character class	                [[:^alpha:]]
+ *      Unicode character class (one-letter)	        \pN
+ *      Unicode character class	                        \p{Greek}
+ *      negated Unicode character class (one-letter)    \PN
+ *      negated Unicode character class	                \P{Greek}
+*/
+// Note: literals and metacharacters are often different within and
+//       outside of character classes, so we handle them separately.
+//       Example: [$]$ --> A literal '$' followed by end of string.
 atom
-    : character_class
-    | escape_sequence
-    | anchor
+    : literal_outside_character_class
+    | meta_outside_character_class
     | grouping
-    | literal
+    | character_class
     ;
 
-character_class
-    : OpenBracket Caret? character_class_type+ CloseBracket
+// Example: r'a9{}<>:,-é'
+literal_outside_character_class
+    : letter
+    | Digit
+    | OpenBrace
+    | CloseBrace
+    | LessThan
+    | GreaterThan
+    | Colon
+    | Comma
+    | Dash
+    | OtherChar
     ;
 
-quantifier
-    : Question Question?                                    # OptionalQuanitifier
-    | Plus Question?                                    # OneOrMoreQuantifier
-    | Star Question?                                    # ZeroOrMoreQuantifier
-    | OpenBrace number (Comma number?)? CloseBrace Question?          # FixedNumberQuantifier
+// Example: r'^\d\n\Cd.\pL\b$'
+meta_outside_character_class
+    : dot_matches_all
+    | perl_character_class
+    | other_escape_sequence
+    | other_escape_sequence_quoted
+    | anchor_char
+    | anchor_escape
+    | unicode_class
     ;
 
+dot_matches_all
+    : Dot
+    ;
+
+/*      Perl character classes (all ASCII-only)
+ *      \d	    digits (≡ [0-9])
+ *      \D	    not digits (≡ [^0-9])
+ *      \s	    whitespace (≡ [\t\n\f\r ])
+ *      \S	    not whitespace (≡ [^\t\n\f\r ])
+ *      \w	    word characters (≡ [0-9A-Za-z_])
+ *      \W	    not word characters (≡ [^0-9A-Za-z_])
+ */
+perl_character_class
+    : DecimalDigit
+    | NotDecimalDigit
+    | Space
+    | NotSpace
+    | WordChar
+    | NotWordChar
+    ;
+
+DecimalDigit:                           '\\d';
+NotDecimalDigit:                        '\\D';
+Space:                                  '\\s';
+NotSpace:                               '\\S';
+WordChar:                               '\\w';
+NotWordChar:                            '\\W';
 
 
+/* (Other) Escape sequences
+ *      \a	        bell (≡ \007)
+ *      \f	        form feed (≡ \014)
+ *      \t	        horizontal tab (≡ \011)
+ *      \n	        newline (≡ \012)
+ *      \r	        carriage return (≡ \015)
+ *      \v	        vertical tab character (≡ \013)
+ *      \*	        literal *, for any punctuation character *
+ *      \123	    octal character code (up to three digits)
+ *      \x7F	    hex character code (exactly two digits)
+ *      \x{10FFFF}	hex character code -- (DL note: in practice, can be 1-6 digits), but here just allow 1 or more
+ *      \C	        match a single byte even in UTF-8 mode
+ *      \Q...\E	    literal text ... even if ... has punctuation
+ */
+other_escape_sequence
+    : BellChar
+    | FormFeed
+    | Tab
+    | Newline
+    | CarriageReturn
+    | VerticalTab
+    | Quoted        // this covers many of the special metachars, such as \(
+    | OctalChar
+    | HexChar
+    ;
+
+BellChar:                               '\\a';
+FormFeed:                               '\\f';
+Tab:                                    '\\t';
+Newline:                                '\\n';
+CarriageReturn:                         '\\r';
+VerticalTab:                            '\\v';
+Quoted:                                 '\\' NonAlphaNumeric;
+
+OctalChar:                              '\\' OctalDigit OctalDigit OctalDigit?;
+HexChar:                                HexCharTwo | HexCharExtended;
+fragment HexCharTwo:                    '\\x' HexDigit HexDigit;
+fragment HexCharExtended:               '\\x' OpenBrace HexDigit+ CloseBrace;
+
+// Note: the following two escape sequences may not be used within a
+//       character classes, so we are separating them into its own rule.
+other_escape_sequence_quoted
+    : OneDataUnit
+    | BlockQuoted
+    ;
+OneDataUnit:                        '\\C';
+BlockQuoted :                       '\\Q' .*? '\\E';
+
+
+/*
+* Empty strings
+* ^	at beginning of text or line (m=true)
+* $	at end of text (like \z not \Z) or line (m=true)
+* \A	at beginning of text
+* \b	at ASCII word boundary (\w on one side and \W, \A, or \z on the other)
+* \B	not at ASCII word boundary
+* \z	at end of text
+*/
+anchor_char
+    : Caret
+    | Dollar
+    ;
+
+// Note: the following are not supported within a character class
+anchor_escape
+    : BeginningOfText
+    | WordBoundary
+    | NotWordBoundary
+    | EndOfText
+    ;
+
+BeginningOfText:                        '\\A';
+WordBoundary:                           '\\b';
+NotWordBoundary:                        '\\B';
+EndOfText:                              '\\z';
+
+
+/*
+ *      Unicode character expressions:
+ *      Unicode character class (one-letter name)	        \pN
+ *      Unicode character class	                            \p{Greek}
+ *      negated Unicode character class (one-letter name)	\PN
+ *      negated Unicode character class	                    \P{Greek}
+ *      ------- one char ----------
+ *      C	    other
+ *      L	    letter
+ *      M	    mark
+ *      N	    number
+ *      P       punctuation
+ *      S	    symbol
+ *      Z	    separator
+ *      ------- two chars ---------
+ *      Cc	    control
+ *      Cf	    format
+ *      Co	    private use
+ *      Cs	    surrogate
+ *      Ll	    lowercase letter
+ *      Lm	    modifier letter
+ *      Lo	    other letter
+ *      Lt	    titlecase letter
+ *      Lu	    uppercase letter
+ *      Mc	    spacing mark
+ *      Me	    enclosing mark
+ *      Mn	    non-spacing mark
+ *      Nd	    decimal number
+ *      Nl	    letter number
+ *      No	    other number
+ *      Pc	    connector punctuation
+ *      Pd	    dash punctuation
+ *      Pe	    close punctuation
+ *      Pf	    final punctuation
+ *      Pi	    initial punctuation
+ *      Po	    other punctuation
+ *      Ps	    open punctuation
+ *      Sc	    currency symbol
+ *      Sk	    modifier symbol
+ *      Sm	    math symbol
+ *      So	    other symbol
+ *      Zl	    line separator
+ *      Zp	    paragraph separator
+ *      Zs	    space separator
+ *      -------------------------------
+ *      [script names should be self explanatory]
+ */
+unicode_class
+    : UnicodeClass
+    | NegatedUnicodeClass
+    ;
+
+UnicodeClass:                           UnicodeClassOne | UnicodeClassExtended;
+NegatedUnicodeClass:                    NegatedUnicodeClassOne | NegatedUnicodeClassExtended;
+
+fragment UnicodeClassOne:               '\\p' UnicodeClassNameOneChar;
+fragment NegatedUnicodeClassOne:        '\\P' UnicodeClassNameOneChar;
+fragment UnicodeClassExtended:          '\\p' OpenBrace (UnicodeClassNameOneChar | UnicodeClassNameTwoChar | UnicodeClassNameScript) CloseBrace;
+fragment NegatedUnicodeClassExtended:   '\\P' OpenBrace (UnicodeClassNameOneChar | UnicodeClassNameTwoChar | UnicodeClassNameScript) CloseBrace;
+
+fragment UnicodeClassNameOneChar:       'C'|'L'|'M'|'N'|'P'|'S'|'Z';
+fragment UnicodeClassNameTwoChar:       'Cc'|'Cf'|'Co'|'Cs'|'Ll'|'Lm'|'Lo'|'Lt'|'Lu'|'Mc'|'Me'|'Mn'|'Nd'|'Nl'|'No'|
+                                        'Pc'|'Pd'|'Pe'|'Pf'|'Pi'|'Po'|'Ps'|'Sc'|'Sk'|'Sm'|'So'|'Zl'|'Zp'|'Zs';
+fragment UnicodeClassNameScript:        'Adlam'|'Ahom'|'Anatolian_Hieroglyphs'|'Arabic'|'Armenian'|'Avestan'|'Balinese'|
+                                        'Bamum'|'Bassa_Vah'|'Batak'|'Bengali'|'Bhaiksuki'|'Bopomofo'|'Brahmi'|'Braille'|'Buginese'|'Buhid'|
+                                        'Canadian_Aboriginal'|'Carian'|'Caucasian_Albanian'|'Chakma'|'Cham'|'Cherokee'|'Chorasmian'|'Common'|
+                                        'Coptic'|'Cuneiform'|'Cypriot'|'Cypro_Minoan'|'Cyrillic'|'Deseret'|'Devanagari'|'Dives_Akuru'|'Dogra'|
+                                        'Duployan'|'Egyptian_Hieroglyphs'|'Elbasan'|'Elymaic'|'Ethiopic'|'Georgian'|'Glagolitic'|'Gothic'|'Grantha'|
+                                        'Greek'|'Gujarati'|'Gunjala_Gondi'|'Gurmukhi'|'Han'|'Hangul'|'Hanifi_Rohingya'|'Hanunoo'|'Hatran'|'Hebrew'|
+                                        'Hiragana'|'Imperial_Aramaic'|'Inherited'|'Inscriptional_Pahlavi'|'Inscriptional_Parthian'|'Javanese'|'Kaithi'|
+                                        'Kannada'|'Katakana'|'Kawi'|'Kayah_Li'|'Kharoshthi'|'Khitan_Small_Script'|'Khmer'|'Khojki'|'Khudawadi'|'Lao'|
+                                        'Latin'|'Lepcha'|'Limbu'|'Linear_A'|'Linear_B'|'Lisu'|'Lycian'|'Lydian'|'Mahajani'|'Makasar'|'Malayalam'|'Mandaic'|
+                                        'Manichaean'|'Marchen'|'Masaram_Gondi'|'Medefaidrin'|'Meetei_Mayek'|'Mende_Kikakui'|'Meroitic_Cursive'|
+                                        'Meroitic_Hieroglyphs'|'Miao'|'Modi'|'Mongolian'|'Mro'|'Multani'|'Myanmar'|'Nabataean'|'Nag_Mundari'|'Nandinagari'|
+                                        'New_Tai_Lue'|'Newa'|'Nko'|'Nushu'|'Nyiakeng_Puachue_Hmong'|'Ogham'|'Ol_Chiki'|'Old_Hungarian'|'Old_Italic'|
+                                        'Old_North_Arabian'|'Old_Permic'|'Old_Persian'|'Old_Sogdian'|'Old_South_Arabian'|'Old_Turkic'|'Old_Uyghur'|
+                                        'Oriya'|'Osage'|'Osmanya'|'Pahawh_Hmong'|'Palmyrene'|'Pau_Cin_Hau'|'Phags_Pa'|'Phoenician'|'Psalter_Pahlavi'|
+                                        'Rejang'|'Runic'|'Samaritan'|'Saurashtra'|'Sharada'|'Shavian'|'Siddham'|'SignWriting'|'Sinhala'|'Sogdian'|
+                                        'Sora_Sompeng'|'Soyombo'|'Sundanese'|'Syloti_Nagri'|'Syriac'|'Tagalog'|'Tagbanwa'|'Tai_Le'|'Tai_Tham'|'Tai_Viet'|
+                                        'Takri'|'Tamil'|'Tangsa'|'Tangut'|'Telugu'|'Thaana'|'Thai'|'Tibetan'|'Tifinagh'|'Tirhuta'|'Toto'|'Ugaritic'|
+                                        'Vai'|'Vithkuqi'|'Wancho'|'Warang_Citi'|'Yezidi'|'Yi'|'Zanabazar_Square';
+
+
+/* 	    Grouping
+ *      (?:re)	        non-capturing group
+ *      (re)	        numbered capturing group (submatch)
+ *      (?P<name>re)	named & numbered capturing group (submatch)
+ *      (?flags)	    set flags within current group; non-capturing
+ *      (?flags:re)	    set flags during re; non-capturing
+ */
 grouping
-    : OpenParen Question (P_Upper LessThan name GreaterThan)? regex CloseParen               # CaptureGroup
-    | OpenParen Question flags (Colon regex)? CloseParen                  # FlagGroup
+    : OpenParen QuestionMark Colon regex CloseParen             # NonCapturingGroup
+    | OpenParen regex CloseParen                                # CapturingGroup
+    | OpenParen QuestionMark P_Upper
+         LessThan name GreaterThan regex CloseParen             # NamedCapturingGroup
+    | OpenParen QuestionMark flags CloseParen                   # FlagGroup
+    | OpenParen QuestionMark flags Colon regex CloseParen       # FlagGroupWithinRegex
     ;
 
-
-
-character_class_type
-    : ascii_class                         # ASCII
-    | unicode_class                       # Unicode
-    | literal Dash literal                           # LiteralRange
-    | literal                                       # LiteralChar
-    ;
-
-number
-    : Digit+
-    ;
-
+/*	    Flags
+ *      i	case-insensitive (default false)
+ *      m	multi-line mode: ^ and $ match begin/end line in addition to begin/end text (default false)
+ *      s	let . match \n (default false)
+ *      U	ungreedy: swap meaning of x* and x*?, x+ and x+?, etc (default false)
+ *
+ *      Flag syntax is xyz (set) or -xyz (clear) or xy-z (set xy, clear z).
+ */
 flags
     : option_flags? Dash option_flags
     | option_flags
     ;
 
 option_flags
-    : (I_Lower | M_Lower | S_Lower U_Upper)+
+    : option_flag+
     ;
-//name: literal;
-//literal
-//    : ANY
-//    ;
 
-DecimalDigit: '\\d';
-NotDecimalDigit: '\\D';
-Space: '\\s';
-NotSpace: '\\S';
-WordChar                : '\\w';
-NotWordChar             : '\\W';
-Dot                     : '.';
-OneDataUnit             : '\\C';
-WordBoundary                   : '\\b';
-NotWordBoundary                : '\\B';
-EndOfString : '\\Z';
-AbsoluteEndOfString                   : '\\z';
-StartOfString                : '\\A';
-EndOfLine             : '$';
-Caret                : '^';
-Quoted      : '\\' NonAlphaNumeric;
-BlockQuoted : '\\Q' .*? '\\E';
+option_flag
+    : I_Lower
+    | M_Lower
+    | S_Lower
+    | U_Upper
+    ;
 
-BellChar       : '\\a';
-FormFeed       : '\\f';
-Tab            : '\\t';
-CarriageReturn : '\\r';
-NewLine        : '\\n';
-VerticalWhiteSpace      : '\\v';
-HexChar        : '\\x' ( HexDigit HexDigit| '{' HexDigit HexDigit HexDigit+'}');
-OctalChar: '\\' OctDigit OctDigit OctDigit;
+// NAMES for use in capturing group of the form (?P<name>regex)
+// Valid names include: (?P<x>abc), (?P<1>abc), (?P<é>abc), ...
+// Can basically be any non-punctuation / non-escape literal
+name
+    : name_char+
+    ;
 
-literal: letter|Digit|OtherChar|punctuation_safe;
-name: name_char;
-name_char: letter|Digit|OtherChar;
-escape_sequence: DecimalDigit|NotDecimalDigit|Space|NotSpace|WordChar|NotWordChar|Dot|OneDataUnit|WordBoundary|NotWordBoundary|EndOfString|AbsoluteEndOfString|Quoted|BlockQuoted|BellChar|FormFeed|Tab|CarriageReturn|Newline|VerticalWhiteSpace|HexChar|OctalChar;
-anchor: Caret|EndOfLine;
-ascii_class: OpenBrace Colon Caret? ('alnum'|'alpha'|'ascii'|'blank'|'cntrl'|'digit'|'graph'|'lower'|'print'|'punct'|'space'|'upper'|'word'|'xdigit') Colon CloseBrace;
-unicode_class: (Escape (P_Upper | P_Lower)) ('C'|'L'|'M'|'N'|'P'|'S'|'Z'|'Adlam'|'Ahom'|'Anatolian_Hieroglyphs'|'Arabic'|'Armenian'|'Avestan'|'Balinese'|'Bamum'|'Bassa_Vah'|'Batak'|'Bengali'|'Bhaiksuki'|'Bopomofo'|'Brahmi'|'Braille'|'Buginese'|'Buhid'|'Canadian_Aboriginal'|'Carian'|'Caucasian_Albanian'|'Chakma'|'Cham'|'Cherokee'|'Chorasmian'|'Common'|'Coptic'|'Cuneiform'|'Cypriot'|'Cypro_Minoan'|'Cyrillic'|'Deseret'|'Devanagari'|'Dives_Akuru'|'Dogra'|'Duployan'|'Egyptian_Hieroglyphs'|'Elbasan'|'Elymaic'|'Ethiopic'|'Georgian'|'Glagolitic'|'Gothic'|'Grantha'|'Greek'|'Gujarati'|'Gunjala_Gondi'|'Gurmukhi'|'Han'|'Hangul'|'Hanifi_Rohingya'|'Hanunoo'|'Hatran'|'Hebrew'|'Hiragana'|'Imperial_Aramaic'|'Inherited'|'Inscriptional_Pahlavi'|'Inscriptional_Parthian'|'Javanese'|'Kaithi'|'Kannada'|'Katakana'|'Kawi'|'Kayah_Li'|'Kharoshthi'|'Khitan_Small_Script'|'Khmer'|'Khojki'|'Khudawadi'|'Lao'|'Latin'|'Lepcha'|'Limbu'|'Linear_A'|'Linear_B'|'Lisu'|'Lycian'|'Lydian'|'Mahajani'|'Makasar'|'Malayalam'|'Mandaic'|'Manichaean'|'Marchen'|'Masaram_Gondi'|'Medefaidrin'|'Meetei_Mayek'|'Mende_Kikakui'|'Meroitic_Cursive'|'Meroitic_Hieroglyphs'|'Miao'|'Modi'|'Mongolian'|'Mro'|'Multani'|'Myanmar'|'Nabataean'|'Nag_Mundari'|'Nandinagari'|'New_Tai_Lue'|'Newa'|'Nko'|'Nushu'|'Nyiakeng_Puachue_Hmong'|'Ogham'|'Ol_Chiki'|'Old_Hungarian'|'Old_Italic'|'Old_North_Arabian'|'Old_Permic'|'Old_Persian'|'Old_Sogdian'|'Old_South_Arabian'|'Old_Turkic'|'Old_Uyghur'|'Oriya'|'Osage'|'Osmanya'|'Pahawh_Hmong'|'Palmyrene'|'Pau_Cin_Hau'|'Phags_Pa'|'Phoenician'|'Psalter_Pahlavi'|'Rejang'|'Runic'|'Samaritan'|'Saurashtra'|'Sharada'|'Shavian'|'Siddham'|'SignWriting'|'Sinhala'|'Sogdian'|'Sora_Sompeng'|'Soyombo'|'Sundanese'|'Syloti_Nagri'|'Syriac'|'Tagalog'|'Tagbanwa'|'Tai_Le'|'Tai_Tham'|'Tai_Viet'|'Takri'|'Tamil'|'Tangsa'|'Tangut'|'Telugu'|'Thaana'|'Thai'|'Tibetan'|'Tifinagh'|'Tirhuta'|'Toto'|'Ugaritic'|'Vai'|'Vithkuqi'|'Wancho'|'Warang_Citi'|'Yezidi'|'Yi'|'Zanabazar_Square');
-//Alpha_Numeric: [a-zA-Z_0-9];
+name_char
+    : letter
+    | Digit
+    | OtherChar
+    ;
 
 
-//anyChar: punctuation|Digit|letter|Other;
-punctuation_safe: CloseBracket|Escape|CloseBracket|OpenBrace|CloseBrace|Colon|Dash|Comma|LessThan|GreaterThan;
-Question: '?';
-Star: '*';
-Plus: '+';
-Or: '|';
-OpenBracket: '[';
-Escape: '\\';
-CloseBracket: ']';
-OpenBrace: '{';
-CloseBrace: '}';
-OpenParen: '(';
-CloseParen: ')';
-LessThan: '<';
-GreaterThan: '>';
-Colon: ':';
-Comma: ',';
-Dash: '-';
+/*      Named character classes as character class elements
+ *      [\d]	    digits (≡ \d)
+ *      [^\d]	    not digits (≡ \D)
+ *      [\D]	    not digits (≡ \D)
+ *      [^\D]	    not not digits (≡ \d)
+ *      [[:name:]]	named ASCII class inside character class (≡ [:name:])
+ *      [^[:name:]]	named ASCII class inside negated character class (≡ [:^name:])
+ *      [\p{Name}]	named Unicode property inside character class (≡ \p{Name})
+ *      [^\p{Name}]	named Unicode property inside negated character class (≡ \P{Name})
+ */
+character_class
+    : OpenBracket Caret character_class_form CloseBracket       # NegatedCharacterClass
+    | OpenBracket character_class_form CloseBracket             # CharacterClass
+    ;
 
-Digit: [0-9];
+// Note: character classes are tricky in terms of handling a Dash.
+//       For example, notice how the "-" is treated in the following situations:
+//      [-]     --> a single dash
+//      [--]    --> also a single dash (even though it's repeated)
+//      [---]   --> a character class that ranges from "-" to "-"
+//      [--x]   --> a character class that ranges from "-" to "x"
+//      [x-]    --> a character class matching "x" or "-"
+//      [-xx]   --> same as previous (even though it's repeated)
+//      [x--]   --> a character class that ranges from "x" to "-" (note this is in invalid range semantically)
+//
+//      [-\d]   --> a "-" or a digit (\d)
+//      [\d-]   --> same as previou
+//      [\d-\d] --> invalid, a character range may not use a non-hex/octal escape sequence
+//      [--\d]  --> same as previous
+//      [\d--]  --> same as previous
+//
+// Note: a character range must also have the second item >= the first.
+//       Ex: [a-b] --> valid; [b-a] --> invalid
+//       This will need to be checked in a listener or equivalent downstream method.
+character_class_form
+    : (Dash Dash?)?                     // [-], [--]
+    | Dash character_class_element+    // [-x]
+    | character_class_element+ Dash?   // [x-], [x]
+    ;
 
-// lowercase and uppercase letters
-letter: A_Lower|B_Lower|C_Lower|D_Lower|E_Lower|F_Lower|G_Lower|H_Lower|I_Lower|J_Lower|K_Lower|L_Lower|M_Lower|N_Lower|O_Lower|P_Lower|Q_Lower|R_Lower|S_Lower|T_Lower|U_Lower|V_Lower|W_Lower|X_Lower|Y_Lower|Z_Lower|A_Upper|B_Upper|C_Upper|D_Upper|E_Upper|F_Upper|G_Upper|H_Upper|I_Upper|J_Upper|K_Upper|L_Upper|M_Upper|N_Upper|O_Upper|P_Upper|Q_Upper|R_Upper|S_Upper|T_Upper|U_Upper|V_Upper|W_Upper|X_Upper|Y_Upper|Z_Upper;
-A_Lower : 'a';
-B_Lower : 'b';
-C_Lower : 'c';
-D_Lower : 'd';
-E_Lower : 'e';
-F_Lower : 'f';
-G_Lower : 'g';
-H_Lower : 'h';
-I_Lower : 'i';
-J_Lower : 'j';
-K_Lower : 'k';
-L_Lower : 'l';
-M_Lower : 'm';
-N_Lower : 'n';
-O_Lower : 'o';
-P_Lower : 'p';
-Q_Lower : 'q';
-R_Lower : 'r';
-S_Lower : 's';
-T_Lower : 't';
-U_Lower : 'u';
-V_Lower : 'v';
-W_Lower : 'w';
-X_Lower : 'x';
-Y_Lower : 'y';
-Z_Lower : 'z';
-A_Upper : 'A';
-B_Upper : 'B';
-C_Upper : 'C';
-D_Upper : 'D';
-E_Upper : 'E';
-F_Upper : 'F';
-G_Upper : 'G';
-H_Upper : 'H';
-I_Upper : 'I';
-J_Upper : 'J';
-K_Upper : 'K';
-L_Upper : 'L';
-M_Upper : 'M';
-N_Upper : 'N';
-O_Upper : 'O';
-P_Upper : 'P';
-Q_Upper : 'Q';
-R_Upper : 'R';
-S_Upper : 'S';
-T_Upper : 'T';
-U_Upper : 'U';
-V_Upper : 'V';
-W_Upper : 'W';
-X_Upper : 'X';
-Y_Upper : 'Y';
-Z_Upper : 'Z';
-OtherChar : . ;
-fragment UnderscoreAlphaNumerics : ('_' | AlphaNumeric)+;
-fragment AlphaNumerics           : AlphaNumeric+;
-fragment AlphaNumeric            : [a-zA-Z0-9];
-fragment NonAlphaNumeric         : ~[a-zA-Z0-9];
-fragment HexDigit: [0-9a-fA-F];
-fragment OctDigit: [0-7];
-fragment ASCII                   : [\u0000-\u007F];
+/* Character class elements
+ *      x	        single character
+ *      A-Z	        character range (inclusive)
+ *      \d	        Perl character class
+ *      [:foo:]	    ASCII character class foo
+ *      \p{Foo}	    Unicode character class Foo
+ *      \pF	        Unicode character class F (one-letter name)
+ */
+character_class_element
+    : character_range                                           # ClassRange
+    | meta_inside_character_class                               # ClassMeta
+    | literal_inside_character_class                            # ClassLiteral
+    ;
+
+character_range
+    : character_range_atom Dash character_range_atom
+    ;
+
+character_range_atom
+    : literal_inside_character_class
+    | HexChar
+    | OctalChar
+    | Dash
+    ;
+
+literal_inside_character_class
+    : letter
+    | Digit
+    | OtherChar
+    | OpenBrace
+    | CloseBrace
+    | LessThan
+    | GreaterThan
+    | Colon
+    | Comma
+    | QuestionMark
+    | Star
+    | Plus
+    | Pipe
+    | OpenBracket
+    | Dollar
+    | Dot
+    | Caret     // special when at the beginning of character class, handled in parent rule
+    ;
+
+meta_inside_character_class
+    : unicode_class
+    | ascii_class
+    | perl_character_class
+    | other_escape_sequence
+    ;
+
+/* ASCII character classes
+ *      [[:alnum:]]	    alphanumeric (≡ [0-9A-Za-z])
+ *      [[:alpha:]]	    alphabetic (≡ [A-Za-z])
+ *      [[:ascii:]]	    ASCII (≡ [\x00-\x7F])
+ *      [[:blank:]]	    blank (≡ [\t ])
+ *      [[:cntrl:]]	    control (≡ [\x00-\x1F\x7F])
+ *      [[:digit:]]	    digits (≡ [0-9])
+ *      [[:graph:]]	    graphical (≡ [!-~] ≡ [A-Za-z0-9!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])
+ *      [[:lower:]]	    lower case (≡ [a-z])
+ *      [[:print:]]	    printable (≡ [ -~] ≡ [ [:graph:]])
+ *      [[:punct:]]	    punctuation (≡ [!-/:-@[-`{-~])
+ *      [[:space:]]	    whitespace (≡ [\t\n\v\f\r ])
+ *      [[:upper:]]	    upper case (≡ [A-Z])
+ *      [[:word:]]	    word characters (≡ [0-9A-Za-z_])
+ *      [[:xdigit:]]	hex digit (≡ [0-9A-Fa-f])
+ */
+ ascii_class
+     : AsciiClass
+     | NegatedAsciiClass
+     ;
+AsciiClass:                             OpenBracket Colon AsciiClassName Colon CloseBracket;
+NegatedAsciiClass:                      OpenBracket Colon AsciiClassName Colon CloseBracket;
+fragment AsciiClassName:                'alnum'|'alpha'|'ascii'|'blank'|'cntrl'|'digit'|'graph'|
+                                        'lower'|'print'|'punct'|'space'|'upper'|'word'|'xdigit';
+
+
+// Various punctuation and single characters
+OpenParen:                              '(';
+CloseParen:                             ')';
+OpenBracket:                            '[';
+CloseBracket:                           ']';
+OpenBrace:                              '{';
+CloseBrace:                             '}';
+LessThan:                               '<';
+GreaterThan:                            '>';
+
+QuestionMark:                           '?';
+Star:                                   '*';
+Plus:                                   '+';
+Pipe:                                   '|';
+
+Dot:                                    '.';
+
+Dollar :                                '$';
+Caret :                                 '^';
+
+Colon:                                  ':';
+Comma:                                  ',';
+Dash:                                   '-';
+
+OtherPunctuation:                       [\p{P}];
+
+
+// Need to capture specific letters for the use of grouping/flags
+letter
+    : I_Lower
+    | M_Lower
+    | P_Upper
+    | S_Lower
+    | U_Upper
+    | Other_Letter
+    ;
+
+I_Lower:                                'i';
+M_Lower:                                'm';
+P_Upper:                                'P';
+S_Lower:                                's';
+U_Upper:                                'U';
+Other_Letter:                           [a-zA-Z];
+
+number
+    : Digit+
+    ;
+
+Digit:                                  [0-9];
+
+Escape:                                 '\\';
+OtherChar:                              .;
+
+InvalidEscape:                          InvalidHexChar | InvalidUnicodeEscape | OtherInvalidEscape;
+
+fragment InvalidHexChar:                '\\x' (OpenBrace .*? CloseBrace|.);
+fragment InvalidUnicodeEscape:          '\\' [pP] (OpenBrace .*? CloseBrace|.);
+fragment OtherInvalidEscape:            '\\' .;
+
+fragment AlphaNumeric:                  [a-zA-Z0-9];
+fragment NonAlphaNumeric:               ~[a-zA-Z0-9];
+fragment HexDigit:                      [0-9a-fA-F];
+fragment OctalDigit:                    [0-7];
