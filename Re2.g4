@@ -44,8 +44,8 @@ root
  *     to force different meanings, just as in arithmetic expressions.
  *     Some examples: ab|cd is equivalent to (ab)|(cd); ab* is equivalent to a(b*).
  *
- *      xy	    x followed by y
- *      x|y	    x or y (prefer x)
+ *      xy      x followed by y
+ *      x|y     x or y (prefer x)
 */
 regex
     : (atom repetition?)*                               # RegexUnit
@@ -53,19 +53,19 @@ regex
     ;
 
 
-/* 	    Repetitions
- *      x*	    zero or more x, prefer more
- *      x+	    one or more x, prefer more
- *      x?	    zero or one x, prefer one
- *      x{n,m}	n or n+1 or ... or m x, prefer more
- *      x{n,}	n or more x, prefer more
- *      x{n}	exactly n x
- *      x*?	    zero or more x, prefer fewer
- *      x+?	    one or more x, prefer fewer
- *      x??	    zero or one x, prefer zero
- *      x{n,m}?	n or n+1 or ... or m x, prefer fewer
- *      x{n,}?	n or more x, prefer fewer
- *      x{n}?	exactly n x
+/*      Repetitions
+ *      x*      zero or more x, prefer more
+ *      x+      one or more x, prefer more
+ *      x?      zero or one x, prefer one
+ *      x{n,m}  n or n+1 or ... or m x, prefer more
+ *      x{n,}   n or more x, prefer more
+ *      x{n}    exactly n x
+ *      x*?     zero or more x, prefer fewer
+ *      x+?     one or more x, prefer fewer
+ *      x??     zero or one x, prefer zero
+ *      x{n,m}? n or n+1 or ... or m x, prefer fewer
+ *      x{n,}?  n or more x, prefer fewer
+ *      x{n}?   exactly n x
 */
 repetition
     : QuestionMark QuestionMark?                        # OptionalQuanitifier
@@ -75,20 +75,20 @@ repetition
     ;
 
 
-/* 	    Atoms
+/*      Atoms
  *
- *      kinds of expressions	                        example
- *      any character	                                .
- *      character class	                                [xyz]
- *      negated character class	                        [^xyz]
+ *      kinds of expressions                            example
+ *      any character                                   .
+ *      character class                                 [xyz]
+ *      negated character class                         [^xyz]
  *      Perl character class                            \d
- *      negated Perl character class	                \D
- *      ASCII character class (link)	                [[:alpha:]]
- *      negated ASCII character class	                [[:^alpha:]]
- *      Unicode character class (one-letter)	        \pN
- *      Unicode character class	                        \p{Greek}
+ *      negated Perl character class                    \D
+ *      ASCII character class (link)                    [[:alpha:]]
+ *      negated ASCII character class                   [[:^alpha:]]
+ *      Unicode character class (one-letter)            \pN
+ *      Unicode character class                         \p{Greek}
  *      negated Unicode character class (one-letter)    \PN
- *      negated Unicode character class	                \P{Greek}
+ *      negated Unicode character class                 \P{Greek}
 */
 // Note: literals and metacharacters are often different within and
 //       outside of character classes, so we handle them separately.
@@ -130,12 +130,12 @@ dot_matches_all
     ;
 
 /*      Perl character classes (all ASCII-only)
- *      \d	    digits (≡ [0-9])
- *      \D	    not digits (≡ [^0-9])
- *      \s	    whitespace (≡ [\t\n\f\r ])
- *      \S	    not whitespace (≡ [^\t\n\f\r ])
- *      \w	    word characters (≡ [0-9A-Za-z_])
- *      \W	    not word characters (≡ [^0-9A-Za-z_])
+ *      \d      digits (≡ [0-9])
+ *      \D      not digits (≡ [^0-9])
+ *      \s      whitespace (≡ [\t\n\f\r ])
+ *      \S      not whitespace (≡ [^\t\n\f\r ])
+ *      \w      word characters (≡ [0-9A-Za-z_])
+ *      \W      not word characters (≡ [^0-9A-Za-z_])
  */
 perl_character_class
     : DecimalDigit
@@ -155,18 +155,18 @@ NotWordChar:                            '\\W';
 
 
 /* (Other) Escape sequences
- *      \a	        bell (≡ \007)
- *      \f	        form feed (≡ \014)
- *      \t	        horizontal tab (≡ \011)
- *      \n	        newline (≡ \012)
- *      \r	        carriage return (≡ \015)
- *      \v	        vertical tab character (≡ \013)
- *      \*	        literal *, for any punctuation character *
- *      \123	    octal character code (up to three digits)
- *      \x7F	    hex character code (exactly two digits)
- *      \x{10FFFF}	hex character code -- (DL note: in practice, can be 1-6 digits), but here just allow 1 or more
- *      \C	        match a single byte even in UTF-8 mode
- *      \Q...\E	    literal text ... even if ... has punctuation
+ *      \a          bell (≡ \007)
+ *      \f          form feed (≡ \014)
+ *      \t          horizontal tab (≡ \011)
+ *      \n          newline (≡ \012)
+ *      \r          carriage return (≡ \015)
+ *      \v          vertical tab character (≡ \013)
+ *      \*          literal *, for any punctuation character *
+ *      \123        octal character code (up to three digits)
+ *      \x7F        hex character code (exactly two digits)
+ *      \x{10FFFF}  hex character code -- (DL note: in practice, can be 1-6 digits), but here just allow 1 or more
+ *      \C          match a single byte even in UTF-8 mode
+ *      \Q...\E     literal text ... even if ... has punctuation
  */
 other_escape_sequence
     : BellChar
@@ -205,12 +205,12 @@ BlockQuoted :                       '\\Q' .*? '\\E';
 
 /*
 * Empty strings
-* ^	at beginning of text or line (m=true)
-* $	at end of text (like \z not \Z) or line (m=true)
-* \A	at beginning of text
-* \b	at ASCII word boundary (\w on one side and \W, \A, or \z on the other)
-* \B	not at ASCII word boundary
-* \z	at end of text
+* ^ at beginning of text or line (m=true)
+* $ at end of text (like \z not \Z) or line (m=true)
+* \A    at beginning of text
+* \b    at ASCII word boundary (\w on one side and \W, \A, or \z on the other)
+* \B    not at ASCII word boundary
+* \z    at end of text
 */
 anchor_char
     : Caret
@@ -233,48 +233,48 @@ EndOfText:                              '\\z';
 
 /*
  *      Unicode character expressions:
- *      Unicode character class (one-letter name)	        \pN
- *      Unicode character class	                            \p{Greek}
- *      negated Unicode character class (one-letter name)	\PN
- *      negated Unicode character class	                    \P{Greek}
+ *      Unicode character class (one-letter name)           \pN
+ *      Unicode character class                             \p{Greek}
+ *      negated Unicode character class (one-letter name)   \PN
+ *      negated Unicode character class                     \P{Greek}
  *      ------- one char ----------
- *      C	    other
- *      L	    letter
- *      M	    mark
- *      N	    number
+ *      C       other
+ *      L       letter
+ *      M       mark
+ *      N       number
  *      P       punctuation
- *      S	    symbol
- *      Z	    separator
+ *      S       symbol
+ *      Z       separator
  *      ------- two chars ---------
- *      Cc	    control
- *      Cf	    format
- *      Co	    private use
- *      Cs	    surrogate
- *      Ll	    lowercase letter
- *      Lm	    modifier letter
- *      Lo	    other letter
- *      Lt	    titlecase letter
- *      Lu	    uppercase letter
- *      Mc	    spacing mark
- *      Me	    enclosing mark
- *      Mn	    non-spacing mark
- *      Nd	    decimal number
- *      Nl	    letter number
- *      No	    other number
- *      Pc	    connector punctuation
- *      Pd	    dash punctuation
- *      Pe	    close punctuation
- *      Pf	    final punctuation
- *      Pi	    initial punctuation
- *      Po	    other punctuation
- *      Ps	    open punctuation
- *      Sc	    currency symbol
- *      Sk	    modifier symbol
- *      Sm	    math symbol
- *      So	    other symbol
- *      Zl	    line separator
- *      Zp	    paragraph separator
- *      Zs	    space separator
+ *      Cc      control
+ *      Cf      format
+ *      Co      private use
+ *      Cs      surrogate
+ *      Ll      lowercase letter
+ *      Lm      modifier letter
+ *      Lo      other letter
+ *      Lt      titlecase letter
+ *      Lu      uppercase letter
+ *      Mc      spacing mark
+ *      Me      enclosing mark
+ *      Mn      non-spacing mark
+ *      Nd      decimal number
+ *      Nl      letter number
+ *      No      other number
+ *      Pc      connector punctuation
+ *      Pd      dash punctuation
+ *      Pe      close punctuation
+ *      Pf      final punctuation
+ *      Pi      initial punctuation
+ *      Po      other punctuation
+ *      Ps      open punctuation
+ *      Sc      currency symbol
+ *      Sk      modifier symbol
+ *      Sm      math symbol
+ *      So      other symbol
+ *      Zl      line separator
+ *      Zp      paragraph separator
+ *      Zs      space separator
  *      -------------------------------
  *      [script names should be self explanatory]
  */
@@ -314,12 +314,12 @@ fragment UnicodeClassNameScript:        'Adlam'|'Ahom'|'Anatolian_Hieroglyphs'|'
                                         'Vai'|'Vithkuqi'|'Wancho'|'Warang_Citi'|'Yezidi'|'Yi'|'Zanabazar_Square';
 
 
-/* 	    Grouping
- *      (?:re)	        non-capturing group
- *      (re)	        numbered capturing group (submatch)
- *      (?P<name>re)	named & numbered capturing group (submatch)
- *      (?flags)	    set flags within current group; non-capturing
- *      (?flags:re)	    set flags during re; non-capturing
+/*      Grouping
+ *      (?:re)          non-capturing group
+ *      (re)            numbered capturing group (submatch)
+ *      (?P<name>re)    named & numbered capturing group (submatch)
+ *      (?flags)        set flags within current group; non-capturing
+ *      (?flags:re)     set flags during re; non-capturing
  */
 grouping
     : OpenParen QuestionMark Colon regex CloseParen             # NonCapturingGroup
@@ -330,11 +330,11 @@ grouping
     | OpenParen QuestionMark flags Colon regex CloseParen       # FlagGroupWithinRegex
     ;
 
-/*	    Flags
- *      i	case-insensitive (default false)
- *      m	multi-line mode: ^ and $ match begin/end line in addition to begin/end text (default false)
- *      s	let . match \n (default false)
- *      U	ungreedy: swap meaning of x* and x*?, x+ and x+?, etc (default false)
+/*      Flags
+ *      i   case-insensitive (default false)
+ *      m   multi-line mode: ^ and $ match begin/end line in addition to begin/end text (default false)
+ *      s   let . match \n (default false)
+ *      U   ungreedy: swap meaning of x* and x*?, x+ and x+?, etc (default false)
  *
  *      Flag syntax is xyz (set) or -xyz (clear) or xy-z (set xy, clear z).
  */
@@ -369,14 +369,14 @@ name_char
 
 
 /*      Named character classes as character class elements
- *      [\d]	    digits (≡ \d)
- *      [^\d]	    not digits (≡ \D)
- *      [\D]	    not digits (≡ \D)
- *      [^\D]	    not not digits (≡ \d)
- *      [[:name:]]	named ASCII class inside character class (≡ [:name:])
- *      [^[:name:]]	named ASCII class inside negated character class (≡ [:^name:])
- *      [\p{Name}]	named Unicode property inside character class (≡ \p{Name})
- *      [^\p{Name}]	named Unicode property inside negated character class (≡ \P{Name})
+ *      [\d]        digits (≡ \d)
+ *      [^\d]       not digits (≡ \D)
+ *      [\D]        not digits (≡ \D)
+ *      [^\D]       not not digits (≡ \d)
+ *      [[:name:]]  named ASCII class inside character class (≡ [:name:])
+ *      [^[:name:]] named ASCII class inside negated character class (≡ [:^name:])
+ *      [\p{Name}]  named Unicode property inside character class (≡ \p{Name})
+ *      [^\p{Name}] named Unicode property inside negated character class (≡ \P{Name})
  */
 character_class
     : OpenBracket Caret character_class_form CloseBracket       # NegatedCharacterClass
@@ -409,12 +409,12 @@ character_class_form
     ;
 
 /* Character class elements
- *      x	        single character
- *      A-Z	        character range (inclusive)
- *      \d	        Perl character class
- *      [:foo:]	    ASCII character class foo
- *      \p{Foo}	    Unicode character class Foo
- *      \pF	        Unicode character class F (one-letter name)
+ *      x           single character
+ *      A-Z         character range (inclusive)
+ *      \d          Perl character class
+ *      [:foo:]     ASCII character class foo
+ *      \p{Foo}     Unicode character class Foo
+ *      \pF         Unicode character class F (one-letter name)
  */
 character_class_element
     : character_range                                           # ClassRange
@@ -461,20 +461,20 @@ meta_inside_character_class
     ;
 
 /* ASCII character classes
- *      [[:alnum:]]	    alphanumeric (≡ [0-9A-Za-z])
- *      [[:alpha:]]	    alphabetic (≡ [A-Za-z])
- *      [[:ascii:]]	    ASCII (≡ [\x00-\x7F])
- *      [[:blank:]]	    blank (≡ [\t ])
- *      [[:cntrl:]]	    control (≡ [\x00-\x1F\x7F])
- *      [[:digit:]]	    digits (≡ [0-9])
- *      [[:graph:]]	    graphical (≡ [!-~] ≡ [A-Za-z0-9!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])
- *      [[:lower:]]	    lower case (≡ [a-z])
- *      [[:print:]]	    printable (≡ [ -~] ≡ [ [:graph:]])
- *      [[:punct:]]	    punctuation (≡ [!-/:-@[-`{-~])
- *      [[:space:]]	    whitespace (≡ [\t\n\v\f\r ])
- *      [[:upper:]]	    upper case (≡ [A-Z])
- *      [[:word:]]	    word characters (≡ [0-9A-Za-z_])
- *      [[:xdigit:]]	hex digit (≡ [0-9A-Fa-f])
+ *      [[:alnum:]]     alphanumeric (≡ [0-9A-Za-z])
+ *      [[:alpha:]]     alphabetic (≡ [A-Za-z])
+ *      [[:ascii:]]     ASCII (≡ [\x00-\x7F])
+ *      [[:blank:]]     blank (≡ [\t ])
+ *      [[:cntrl:]]     control (≡ [\x00-\x1F\x7F])
+ *      [[:digit:]]     digits (≡ [0-9])
+ *      [[:graph:]]     graphical (≡ [!-~] ≡ [A-Za-z0-9!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])
+ *      [[:lower:]]     lower case (≡ [a-z])
+ *      [[:print:]]     printable (≡ [ -~] ≡ [ [:graph:]])
+ *      [[:punct:]]     punctuation (≡ [!-/:-@[-`{-~])
+ *      [[:space:]]     whitespace (≡ [\t\n\v\f\r ])
+ *      [[:upper:]]     upper case (≡ [A-Z])
+ *      [[:word:]]      word characters (≡ [0-9A-Za-z_])
+ *      [[:xdigit:]]    hex digit (≡ [0-9A-Fa-f])
  */
  ascii_class
      : AsciiClass
