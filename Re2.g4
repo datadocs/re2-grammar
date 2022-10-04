@@ -48,8 +48,8 @@ root
  *      x|y     x or y (prefer x)
 */
 regex
-    : (atom repetition?)*                               # RegexUnit
-    | regex (Pipe regex)+                               # RegexAlternation
+    : (atom repetition?)*                                           # RegexUnit
+    | regex (Pipe regex)+                                           # RegexAlternation
     ;
 
 
@@ -68,10 +68,10 @@ regex
  *      x{n}?   exactly n x
 */
 repetition
-    : QuestionMark QuestionMark?                        # OptionalQuanitifier
-    | Plus QuestionMark?                                # OneOrMoreQuantifier
-    | Star QuestionMark?                                # ZeroOrMoreQuantifier
-    | OpenBrace number (Comma number?)? CloseBrace      # NumericQuantifier
+    : QuestionMark QuestionMark?                                    # OptionalQuanitifier
+    | Plus QuestionMark?                                            # OneOrMoreQuantifier
+    | Star QuestionMark?                                            # ZeroOrMoreQuantifier
+    | OpenBrace number (Comma number?)? CloseBrace QuestionMark?    # NumericQuantifier
     ;
 
 
@@ -322,12 +322,12 @@ fragment UnicodeClassNameScript:        'Adlam'|'Ahom'|'Anatolian_Hieroglyphs'|'
  *      (?flags:re)     set flags during re; non-capturing
  */
 grouping
-    : OpenParen QuestionMark Colon regex CloseParen             # NonCapturingGroup
-    | OpenParen regex CloseParen                                # CapturingGroup
+    : OpenParen QuestionMark Colon regex CloseParen                 # NonCapturingGroup
+    | OpenParen regex CloseParen                                    # CapturingGroup
     | OpenParen QuestionMark P_Upper
-         LessThan name GreaterThan regex CloseParen             # NamedCapturingGroup
-    | OpenParen QuestionMark flags CloseParen                   # FlagGroup
-    | OpenParen QuestionMark flags Colon regex CloseParen       # FlagGroupWithinRegex
+         LessThan name GreaterThan regex CloseParen                 # NamedCapturingGroup
+    | OpenParen QuestionMark flags CloseParen                       # FlagGroup
+    | OpenParen QuestionMark flags Colon regex CloseParen           # FlagGroupWithinRegex
     ;
 
 /*      Flags
@@ -549,3 +549,9 @@ fragment AlphaNumeric:                  [a-zA-Z0-9];
 fragment NonAlphaNumeric:               ~[a-zA-Z0-9];
 fragment HexDigit:                      [0-9a-fA-F];
 fragment OctalDigit:                    [0-7];
+
+
+// For test parsing on an input file containing multiple patterns
+test_root
+    : regex ('\n' regex)* EOF
+    ;
