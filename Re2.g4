@@ -75,9 +75,7 @@ repetition
     ;
 
 
-/*      Atoms
- *
- *      kinds of expressions                            example
+/*      kinds of Atoms/Expressions                      example
  *      any character                                   .
  *      character class                                 [xyz]
  *      negated character class                         [^xyz]
