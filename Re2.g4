@@ -24,7 +24,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Project          : PCRE Parser, an ANTLR 4 grammar for PCRE
+ * Project          : An ANTLR 4 grammar for Re2
  * Developed by     : David Litwin, david@datadocs.com
  * Grammar from     : https://github.com/google/re2/wiki/Syntax/
  * Inspiration from : Bart Kiers' https://github.com/bkiers/pcre-parser/blob/master/src/main/antlr4/nl/bigo/pcreparser/PCRE.g4
