@@ -110,6 +110,7 @@ literal_outside_character_class
     | Comma
     | Dash
     | OtherChar
+    | OtherPunctuation
     ;
 
 // Example: r'^\d\n\Cd.\pL\b$'
@@ -377,34 +378,10 @@ name_char
  *      [^\p{Name}] named Unicode property inside negated character class (≡ \P{Name})
  */
 character_class
-    : OpenBracket Caret character_class_form CloseBracket       # NegatedCharacterClass
-    | OpenBracket character_class_form CloseBracket             # CharacterClass
+    : OpenBracket Caret character_class_element+ CloseBracket       # NegatedCharacterClass
+    | OpenBracket character_class_element+ CloseBracket             # CharacterClass
     ;
 
-// Note: character classes are tricky in terms of handling a Dash.
-//       For example, notice how the "-" is treated in the following situations:
-//      [-]     --> a single dash
-//      [--]    --> also a single dash (even though it's repeated)
-//      [---]   --> a character class that ranges from "-" to "-"
-//      [--x]   --> a character class that ranges from "-" to "x"
-//      [x-]    --> a character class matching "x" or "-"
-//      [-xx]   --> same as previous (even though it's repeated)
-//      [x--]   --> a character class that ranges from "x" to "-" (note this is in invalid range semantically)
-//
-//      [-\d]   --> a "-" or a digit (\d)
-//      [\d-]   --> same as previou
-//      [\d-\d] --> invalid, a character range may not use a non-hex/octal escape sequence
-//      [--\d]  --> same as previous
-//      [\d--]  --> same as previous
-//
-// Note: a character range must also have the second item >= the first.
-//       Ex: [a-b] --> valid; [b-a] --> invalid
-//       This will need to be checked in a listener or equivalent downstream method.
-character_class_form
-    : (Dash Dash?)?                     // [-], [--]
-    | Dash character_class_element+    // [-x]
-    | character_class_element+ Dash?   // [x-], [x]
-    ;
 
 /* Character class elements
  *      x           single character
@@ -424,17 +401,22 @@ character_range
     : character_range_atom Dash character_range_atom
     ;
 
+// It is difficult to determine whether a range is valid or not
+// For example:   [a-b[:ascii:]c-d]   valid, [:ascii:] not used in range
+//                [a-b[:ascii:]-d]    invalid, cannot be used in range
+//
+// We want to 'catch' the invalid range and deal with it in the Listener
+// or other method, as otherwise it will fall-through to its next alternation
+// where it would come out as a valid non-character range.
 character_range_atom
-    : literal_inside_character_class
-    | HexChar
-    | OctalChar
-    | Dash
+    : literal_inside_character_class                            # RangeLiteral
+    | (HexChar|OctalChar)                                       # RangeEscape
+    | (perl_character_class|ascii_class|unicode_class)          # RangeInvalid
     ;
 
 literal_inside_character_class
     : letter
     | Digit
-    | OtherChar
     | OpenBrace
     | CloseBrace
     | LessThan
@@ -445,10 +427,14 @@ literal_inside_character_class
     | Star
     | Plus
     | Pipe
-    | OpenBracket
     | Dollar
     | Dot
+    | OpenBracket
+    | CloseBracket // such as ^[]]$
     | Caret     // special when at the beginning of character class, handled in parent rule
+    | OtherChar
+    | OtherPunctuation
+    | Dash
     ;
 
 meta_inside_character_class
