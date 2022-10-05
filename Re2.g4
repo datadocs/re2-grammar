@@ -288,13 +288,18 @@ NegatedUnicodeClass:                    NegatedUnicodeClassOne | NegatedUnicodeC
 
 fragment UnicodeClassOne:               '\\p' UnicodeClassNameOneChar;
 fragment NegatedUnicodeClassOne:        '\\P' UnicodeClassNameOneChar;
-fragment UnicodeClassExtended:          '\\p' OpenBrace (UnicodeClassNameOneChar | UnicodeClassNameTwoChar | UnicodeClassNameScript) CloseBrace;
-fragment NegatedUnicodeClassExtended:   '\\P' OpenBrace (UnicodeClassNameOneChar | UnicodeClassNameTwoChar | UnicodeClassNameScript) CloseBrace;
+fragment UnicodeClassExtended:          '\\p' OpenBrace (UnicodeClassNameOneChar | UnicodeClassNameTwoChar | UnicodeClassNameScript) CloseBrace
+                                      | '\\P' OpenBrace '^' (UnicodeClassNameOneChar | UnicodeClassNameTwoChar | UnicodeClassNameScript) CloseBrace;
+fragment NegatedUnicodeClassExtended:   '\\P' OpenBrace (UnicodeClassNameOneChar | UnicodeClassNameTwoChar | UnicodeClassNameScript) CloseBrace
+                                      | '\\p' OpenBrace '^' (UnicodeClassNameOneChar | UnicodeClassNameTwoChar | UnicodeClassNameScript) CloseBrace;
 
+// Note: the below is not comprehensive, and it's worth noting that RE2 can build against ICU for
+// full Unicode properties support, which means that things like \p{Emoji} work as well
+// For a simpler match we could do (UnderscoreAlphaNumeric+ | UnicodeClassNameOneChar)
 fragment UnicodeClassNameOneChar:       'C'|'L'|'M'|'N'|'P'|'S'|'Z';
 fragment UnicodeClassNameTwoChar:       'Cc'|'Cf'|'Co'|'Cs'|'Ll'|'Lm'|'Lo'|'Lt'|'Lu'|'Mc'|'Me'|'Mn'|'Nd'|'Nl'|'No'|
                                         'Pc'|'Pd'|'Pe'|'Pf'|'Pi'|'Po'|'Ps'|'Sc'|'Sk'|'Sm'|'So'|'Zl'|'Zp'|'Zs';
-fragment UnicodeClassNameScript:        'Adlam'|'Ahom'|'Anatolian_Hieroglyphs'|'Arabic'|'Armenian'|'Avestan'|'Balinese'|
+fragment UnicodeClassNameScript:        'Any' | 'Adlam'|'Ahom'|'Anatolian_Hieroglyphs'|'Arabic'|'Armenian'|'Avestan'|'Balinese'|
                                         'Bamum'|'Bassa_Vah'|'Batak'|'Bengali'|'Bhaiksuki'|'Bopomofo'|'Brahmi'|'Braille'|'Buginese'|'Buhid'|
                                         'Canadian_Aboriginal'|'Carian'|'Caucasian_Albanian'|'Chakma'|'Cham'|'Cherokee'|'Chorasmian'|'Common'|
                                         'Coptic'|'Cuneiform'|'Cypriot'|'Cypro_Minoan'|'Cyrillic'|'Deseret'|'Devanagari'|'Dives_Akuru'|'Dogra'|
@@ -532,6 +537,7 @@ fragment InvalidHexChar:                '\\x' (OpenBrace .*? CloseBrace|.);
 fragment InvalidUnicodeEscape:          '\\' [pP] (OpenBrace .*? CloseBrace|.);
 fragment OtherInvalidEscape:            '\\' .;
 
+fragment UnderscoreAlphaNumeric:       ('_' | AlphaNumeric);
 fragment AlphaNumeric:                  [a-zA-Z0-9];
 fragment NonAlphaNumeric:               ~[a-zA-Z0-9];
 fragment HexDigit:                      [0-9a-fA-F];

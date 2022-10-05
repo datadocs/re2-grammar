@@ -7,6 +7,6 @@ Test patterns taken from: https://github.com/golang/go/tree/master/src/regexp/te
 To test:
 
 ```
-$ antlr4 Re2.g4 -o out && cd out && javac Re2*.java && java org.antlr.v4.gui.TestRig Re2 test_root ../tests/re2-exhaustive-distinct.txt ../tests/re2-search.txt && cd ..
+$ antlr4 Re2.g4 -o out && cd out && javac Re2*.java && java org.antlr.v4.gui.TestRig Re2 test_root ../tests/patterns.txt && cd ..
 ```
 
