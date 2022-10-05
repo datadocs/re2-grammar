@@ -109,6 +109,7 @@ literal_outside_character_class
     | Colon
     | Comma
     | Dash
+    | SingleSpace
     | OtherChar
     | OtherPunctuation
     ;
@@ -432,6 +433,7 @@ literal_inside_character_class
     | OpenBracket
     | CloseBracket // such as ^[]]$
     | Caret     // special when at the beginning of character class, handled in parent rule
+    | SingleSpace
     | OtherChar
     | OtherPunctuation
     | Dash
@@ -521,6 +523,7 @@ number
 Digit:                                  [0-9];
 
 Escape:                                 '\\';
+SingleSpace:                            ' ';
 OtherChar:                              .;
 
 InvalidEscape:                          InvalidHexChar | InvalidUnicodeEscape | OtherInvalidEscape;
